@@ -31,19 +31,16 @@ installed manually.
 
 
 from pykml.factory import KML_ElementMaker as KML
-from pykml.factory import ATOM_ElementMaker as ATOM
 from pykml.factory import GX_ElementMaker as GX
 from lxml import etree
 import exiftool
 
 import argparse
 import configparser
-from datetime import datetime
 import os
 import os.path
 import re
 import sys
-import time
 
 def run():
     """
@@ -55,15 +52,17 @@ def run():
     ap = argparse.ArgumentParser()
     ap.add_argument('-c', '--config',
                     default='jpggps.config',
-                    help='configuration file with values for arguments in the [arguments] section')
+                    help='configuration file with values for arguments in ' \
+                         'the [arguments] section')
     ap.add_argument('-t', '--timezone',
-                    help='timezone ofset from UTC in the format (+/-)hhmm, eg. PST = -0800, PDT = -0700')
+                    help='timezone ofset from UTC in the format (+/-)hhmm, ' \
+                         'eg. PST = -0800, PDT = -0700')
     ap.add_argument('-o', '--output',
                     help='output filename')
     ap.add_argument('-u', '--url',
                     help='''base url for files, e.g.
-                               for disk files file:///absolute/path/to/directory/
-                               for files on the web http://host.domain/path/to/dir/''')
+                            for disk files file:///absolute/path/to/directory/
+                            for web files http://host.domain/path/to/dir/''')
     ap.add_argument('-p', '--progress',
                     choices=['none','normal','debug'],
                     help='progress message detail')
@@ -156,11 +155,10 @@ def run():
 
                         if 'EXIF:GPSLongitude' in tags:
                             # GPS metadata id available
-                            lat = lon = date = None
+                            lat = lon = None
+                            datestr = datetimestr = ''
                             alt = 0
                             active = full = False
-                            picture_time = ''
-                            picture_place = ''
 
                             if "EXIF:GPSLatitude" in tags:
                                 lat = tags['EXIF:GPSLatitude']
@@ -214,7 +212,9 @@ def run():
                                 places[basedir][filebase]['time'] = \
                                     GX.when(datetimestr)
                                 places[basedir][filebase]['place'] = \
-                                    GX.coord('{0} {1} {2}'.format(lon, lat, alt))
+                                    GX.coord('{0} {1} {2}'.format(lon, 
+                                                                  lat, 
+                                                                  alt))
                                 places[basedir][filebase]['point'] = \
                                     KML.Point(
                                         KML.coordinates('{0},{1},{2}'.format\
