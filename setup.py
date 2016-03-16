@@ -19,5 +19,9 @@ setup(name='jpggps2kml',
       author_email='russell@roredman.ca',
       install_requires=['pykml','pyexiftool'],
       packages=find_packages(exclude=['*.test']),
-      entry_points = {'jpggps': ['jpggps = jpggps2kml/jpggps2kml:run']}
+      entry_points = {'console_scripts': 
+                         ['makegpx = jpggps2kml.jpggps2kml:makegpx',
+                          'editgps = jpggps2kml.jpggps2kml:editgps',
+                          'orientjpeg = jpggps2kml.jpggps2kml:orient',
+                          'makekml = jpggps2kml.jpggps2kml:makekml']}
       )
