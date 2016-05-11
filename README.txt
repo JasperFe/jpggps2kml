@@ -139,7 +139,7 @@ The configuration file has the form:
   [arguments]
   fmt = FMT # path to the gpx template found at $(EXIFTOOL}/fmt_files.gpx.fmt
   gpx = GPX # path to the directory containing gpx files
-  kml = KML # path to the kml output file
+  out = OUT # path to a single output file
   replace = True/False # replace duplicates items
   timezone = +HH:MM[:SS] # Offset from UTC for camera local time
   url = URL # URL to access installed images
@@ -204,7 +204,7 @@ This command uses the --utc and dir arguments.
 The --utc argument specifies the UTC in one of two formats:
   ISO 8601: YYYY-MM-DDTHH:MM:SS
   EXIF: YYYY:MM:DD HH:MM:SS
-Note that the EXIF format must be protected with quotes to keep it as a 
+Note that the EXIF format must be protected with single quotes to keep it as a 
 single token, e.g. --utc='2016:01:20 10:25:02'.  When the --utc argument is 
 supplied, the positional argument dir must be the path to a single JPEG file 
 from which the DateTimeOriginal will be read for comparison with the value of 
@@ -216,10 +216,10 @@ and or a set of directories containing JPEG files.  The program will iterate
 over all of the JPEG files, printing to stdout the offset calculated for each 
 file that has GPSStatus Active. 
 
-If only one value of the ofset is found (no matter whether from a single JPEG
+If only one value of the offset is found (no matter whether from a single JPEG
 file or several) the output written to stdout will have the form
   most negative = -AllDates-=07:00:02
-where the string starting "-AllDates" can be cut and pasted into config file
+where the string starting "-AllDates" can be cut and pasted into a config file
 as the --offset argument.
 
 It will often be the case when the offset is determinded from the GPSTimeStamp
@@ -247,7 +247,7 @@ from the JPEG files for each day.  The command is somewhat fussy, so this
 package provides the command "makegpx" to read the format and dispatch the
 command.
 
-This command uses the --fmt, --gpx, --replace and --verbosity and dir 
+This command uses the --fmt, --out, --replace and --verbosity and dir 
 arguments. 
 
 The --fmt argument is required, and specifies the path to the GPX format file
@@ -255,10 +255,7 @@ to be used by exiftool.  A suitable example is supplied in the exiftool
 source directories at fmt_files/gpx.fmt.  This argument is best set in a 
 configuration file.  
 
-The --gpx argument is optional and defaults to '.' (current directory) if not 
-specified.  For the makegpx command, --gpx specifies the output directory to 
-hold new GPX files.  It avoid unexpected overwrites, it should normally be 
-set as an absolute path in the configuration file. 
+The --out argument is required and specifies the path to the output GPX file.  
 
 The --replace argument if True instructs makegpx to replace existing gpx
 files if new files are generated.  Otherwise, the old file will be retained
@@ -276,25 +273,25 @@ The remaining arguments are ignored.
 Thus the command
    makegpx \
       --fmt=gpx.fmt \
-      --gpx=/Users/russell/aux \
+      --out=/Users/russell/aux/2016-01-02.gpx \
       --replace=True \
       --verbosity=quiet \
-      ~/Pictures/2016-01-02 ~/Pictures/2016-01-03
+      ~/Pictures/2016-01-02
 will store new gpx files in /Users/russell/aux using the template gpx.fmt from
 the current directory and searching for GPS position in JPEG files in the 
-directories ~/Pictures/2016-01-02 and ~/Pictures/2016-01-03. It will replace 
-old GPX files if necessary, and will run quietly with no progress messages.  
+directory ~/Pictures/2016-01-02. It will replace old GPX files if necessary, 
+and will run quietly with no progress messages.  
 
 With the configuration file gpx.config in the current directory containing
   [arguments]
   fmt = gpx.fmt
-  gpx = /Users/rusell/aux
+  out = /Users/rusell/aux/2016-01-02.gpx
   replace = True
   timezone = -08:00
   verbosity = quiet
-  dir = ~/staging/2016-01-02,~/staging/2016-01-03
+  dir = ~/staging/2016-01-02
 the command
-   makegpx -c gpx.config ~/Pictures/2016-01-02 ~/Pictures/2016-01-03
+   makegpx -c gpx.config
 would do the same thing.  Note that the timezone and dir arguments from the 
 configuration file are ignored, the value of timezone because makegpx does not 
 use the argument and the value of dir because it is overridden by the pair of 
@@ -309,24 +306,25 @@ argument to interpolate nominal GPS locations based on the OriginalDateTime.
 
 The command uses the --gpx, --timezone, --verbosity and dir arguments.
 
-The --gpx argument specifies the directory to search for gpx files.  The 
-editgps program will read each GPX file, extracting the earliest and latest 
-datetimes that will be recorded in a list of GPX files.  It is an error for 
-GPX files in the --gpx directory to have overlapping ranges of datetime.  When 
-editting a JPEG file, the OriginalDateTime header will be translated into UTC 
-(see the --timezone argument) and used to search for a matching GPX file.  If
-originalDateTime falls within the range of any of one of the GPX files, an
-exiftool command will be executed to interpolate a GPS position and edit the 
-EXIF GPS headers for the JPEG file.
+The --gpx argument is optional and specifies the directory to search for 
+GPX files.  If not specified, the program will search for gpx files in the 
+directories listed in the dir argument.  The editgps program will read each 
+GPX file, extracting the earliest and latest datetimes that will be recorded 
+in a list of GPX files.  It is an error for GPX files in the --gpx directory 
+to have overlapping ranges of datetime.  When editting a JPEG file, the 
+OriginalDateTime header will be translated into UTC (see the --timezone 
+argument) and used to search for a matching GPX file.  If OriginalDateTime 
+falls within the range of any of one of the GPX files, an exiftool command 
+will be executed to interpolate a GPS position and edit the EXIF GPS headers 
+for the JPEG file.
 
 The --timezone argument gives the offset from UTC for the local time used in 
 the camera, which need not be a standard timezone, in the format +/-HH:MM[:SS].
-This allows the correct GPS time (very close to UTC) to be determined even if 
-the clock in the camera was set incorrectly.  The seconds part of the offset 
-is optional and can be used to correct any difference noted between 
-the GPSDateStamp and OriginalDateTime headers.  If --timezone=auto, this 
-an attempt will be made to set this value automatically from JPEG files for 
-which GPSStatus == 1 (Active).
+This allows the correct UTC time to be determined even if the clock in the 
+camera was set incorrectly.  The seconds part of the offset is optional and 
+can be used to correct any difference noted between the GPSDateStamp and 
+OriginalDateTime headers.  If --timezone=auto, an attempt will be made to set 
+this value automatically from JPEG files for which GPSStatus == 1 (Active).
 
 The --verbosity argument is optional and defaults to normal if omitted.  This
 should be correct and would not normally be given a default value in the
@@ -341,7 +339,7 @@ There are two cautions to note with this command:
 and CAN CORRUPT the JPEG files.  Never do this to the original JPEG files, but 
 only to copies that can be easily restored.
 
-2) This edits GPS headers,not the gpx files, so the command is editgps, 
+2) This edits GPS headers, not the gpx files, so the command is editgps, 
 not editgpx.
 
 For example, the command
@@ -357,9 +355,9 @@ configuration file.
 USING orientjpeg TO STANDARDIZE THE ORIENTATION OF JPEG IMAGES
 ==============================================================
 
-The orientjpeg command rotates/flips the image in a JPEG file so that the (0, 0)
-pixel is in the upper left corner, the standard orientation of most images.
-this corresponds to the tag EXIF:Orientation = 1.  
+The orientjpeg command rotates/flips the image in a JPEG file so that the 
+(0, 0) pixel is in the upper left corner, the standard orientation of most 
+images.  This corresponds to the tag EXIF:Orientation = 1.  
 
 This command is a thin wrapper around the jpegtran command, following the 
 algorithm of the IJG shell script exifautotran supplied by IJG at:
@@ -370,21 +368,22 @@ shell script supplied by IJG.
 USING makekml TO CREATE A KML FILE DISPLAYING THE GPX TRACKS AND IMAGES
 =======================================================================
 
-The makekml commnd reads tracks from the GPX files in the --gpx directory
-and for each image in the set of directories in dir that has GPS coordinates 
-creates a placemark.  The tracks and placemarks are written into a KML file
-that can be imported into Google Earth or Google Maps for viewing.  The KML 
-file can be built up incrementally, adding tracks and placemarks from 
-differentdirectories on each invocation.
+The makekml command creates a KML file that contains copies of the tracks 
+from each GPX file and a list of placemarks for each JPEG image that has GPS
+coordinates in its header.  The KML file can be imported into Google Earth or 
+Google Maps for viewing.  The placemark for each JPEG image will pop up the
+image when selected.  The KML file can be built up incrementally, adding 
+tracks and placemarks from different directories on each invocation.
 
-This command uses the --gpx, --kml, --replace, --url, --verbosity, and dir 
+This command uses the --gpx, --out, --replace, --url, --verbosity, and dir 
 arguments.
 
 The --gpx argument specifies the path to a directory containing GPX files
 from which a set of tracks will be read.  Track names in the KML file will be 
-the same as the GPX file basename.
+the same as the GPX file basename.  If --gpx is not specified, the directories 
+listed in the dir argument will be searched for gpx files.
 
-The --kml argument specifies the path to the output KML file and is required.
+The --out argument specifies the path to the output KML file and is required.
 
 The --replace argument is a boolean that indicates whether duplicate entries
 (tracks or placemarks) should be skipped or replaced in the KML file.

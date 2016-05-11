@@ -167,10 +167,9 @@ class jpggps2kml():
                         help='offset to be added to DateTimeOriginal '
                              'to compute UTC, in the format +/-HH:MM:SS')
         ap.add_argument('-g', '--gpx',
-                        help='GPX directory used as ouput in makegpx() and '\
-                             'as input in editgps()')
-        ap.add_argument('-k', '--kml',
-                        help='KML filename used in makekml()')
+                        help='directory containing GPX files')
+        ap.add_argument('-o', '--out',
+                        help='output filename')
         ap.add_argument('-r', '--replace',
                         help='Replace dupicate Elements in an existing KML '
                              'file, otherwise skip the new item')
@@ -195,6 +194,7 @@ class jpggps2kml():
             else:
                 print('config file not found at ' + configfile, 
                       file=sys.stderr)
+                sys.exit(-1)
     
         # Override selected config values from the command line
         args = self.config['arguments']
@@ -235,6 +235,18 @@ class jpggps2kml():
                     self.dirs.append(absdir)
                 elif os.path.isfile(absdir):
                     self.files.append(absdir)
+
+        # Expand --gpx argument if supplied
+        if 'gpx' in args and args['gpx']:
+            args['gpx'] = os.path.abspath(
+                              os.path.expanduser(
+                                  os.path.expandvars(args['gpx'])))
+        
+        # Expand --out argument if supplied
+        if 'out' in args and args['out']:
+            args['out'] = os.path.abspath(
+                              os.path.expanduser(
+                                  os.path.expandvars(args['out'])))
 
         self.verbosity = 1
         if args['verbosity'] == 'quiet':
@@ -307,12 +319,33 @@ class jpggps2kml():
         """
         Returns a list of (abspath, basename) tuples of GPX files in --gpx 
         """
+        args = self.config['arguments']
         gpxlist = []
-        gpxdir = self.config['arguments']['gpx']
-        for f in os.listdir(gpxdir):
+        
+        # if --gpx was specified, search there for GX files and ignore any
+        # found in dirs.  Otherwise search for all GPX files in dirs.
+        if 'gpx' in args and args['gpx']:
+            gpxdirs = [args['gpx']]
+        else:
+            gpxdirs = self.dirs
+        
+        for gpxdir in gpxdirs:
+            for f in os.listdir(gpxdir):
+                fbase, fext = os.path.splitext(f)
+                
+                if fext in ('.gpx', '.GPX'):
+                    gpxlist.append((os.path.join(gpxdir, f), fbase))
+        
+        # If a GPX file is specified on the command line, include it
+        for f in self.files:
             fbase, fext = os.path.split(f)
-            if fext in ('.gpx', '.GPX'):
-                gpxlist.append((os.path.join(gpxdir, f), fbase))
+            fbase = os.path.basename(fbase)
+            if fext in ('.gpx', '.GPX') and os.path.isfile(f):
+                gpxlist.append((f, fbase))
+        
+        if self.verbosity > 1:
+            print(repr(gpxlist), file=sys.stderr)
+        
         return gpxlist
 
     def read_track_from_gpx(self, 
@@ -333,19 +366,25 @@ class jpggps2kml():
         
         On successful exit, trackfolder and colourIndex will have been updated.
         """
-        gpxtree = etree.parse(filepath).getroot()
-        namespace = gpxtree.attrib('xmlns')
+        args = self.config['arguments']
+        gpxtree = etree.parse(filepath).getroot()        
+        namespace = gpxtree.nsmap[None]
         if self.verbosity > 1:
-            print(filepath + ': ' + namespace, file=sys.stderr)
+            print('namespace for ' + filepath + ': ' + namespace, 
+                  file=sys.stderr)
         
-        for gpxtrack in gpxtree.getiterator(namespace + ':trk'):
+        print('{%s}trk' % namespace, file=sys.stderr)
+        print(namespace + 'trk', file=sys.stderr)
+        for gpxtrack in gpxtree.getiterator('{%s}trk' % namespace):
+            print('got here', file=sys.stderr)
             # Extract the track name from the GPX track
             try:
-                trackname = gpxtrack.find(namespace + ':name').text
+                trackname = gpxtrack.find('{%s}name' % namespace).text
             except:
                 print('track does not have name in ' + filepath, 
                       file=sys.stderr)
                 trackname = filebase
+            print('trackname = ' + trackname, file=sys.stderr)
 
             # does a Placemark already exist with this name?
             placemark = None
@@ -353,7 +392,7 @@ class jpggps2kml():
                 if pm.find('KML.name').text == trackname:
                     placemark = pm
                     break
-            if self.config['arguments']['replace']:
+            if 'replace' in args and args['replace']:
                 trackfolder.drop(placemark)
                 placemark = None
             
@@ -371,7 +410,7 @@ class jpggps2kml():
                 trackfolder.append(placemark)
 
                 tracklist = []
-                for gpxtrkseg in gpxtrack.getiterator(namespace + ':trkseg'):
+                for gpxtrkseg in gpxtrack.getiterator('{%s}trkseg' % namespace):
                     # A GPX trkseg translates into aGX.track
                     kmltrack = GX.Track(
                         KML.altitudeMode('clampToGround')
@@ -432,14 +471,17 @@ class jpggps2kml():
         and the full url to locate the image in the KML file will be
             '/'.join(self.url, jpegrooted)
         """
+        args = self.config['arguments']
+        
         # Does a placemark for this image already exist in the imagefolder?
-        for pm in imagefolder.children():
-            if pm.find('Name').text == jpegbase:
+        for pm in imagefolder:
+            name = pm.find('Name')
+            if name and name.text == jpegbase:
                 if self.verbosity > 1:
                     print(jpegbase,'found in imagefolder', file=sys.stderr)
                 
                 # image already present
-                if self.config['arguments']['replace']:
+                if 'replace' in args and args['replace']:
                     # replace the image by dropping the existing copy
                     if self.verbosity > 1:
                         print('replace ' + jpegbase, file=sys.stderr)
@@ -494,17 +536,19 @@ class jpggps2kml():
                   '\n',
                   file=sys.stderr)
 
+        in_kml = ''
         if datestr and timestr and lat and lon:
             in_kml = ' in kml'
 
-            if self.config['arguments']['url']:
+            if 'url' in args and args['url']:
                 jpegurl = '/'.join(self.config['arguments']['url'], jpegrooted)
             else:
-                jpegurl = '/'.join('file:/', jpegdisk)
+                jpegurl = '/'.join(['file:/', jpegdisk])
             
-            cdatakey = 'CDATA' + jpegrooted + datestr + jpegbase
+ #           cdatakey = 'CDATA' + jpegrooted + datestr + jpegbase
+            cdatakey = datestr + jpegbase
             self.cdatatext[cdatakey] = ('<![CDATA[<img src="' + 
-                jpegurl + ' width=400/><br/>' + 
+                jpegurl + '" width=400/><br/>' + 
                 'in ' + os.path.dirname(jpegrooted) + 
                 ' at ' + timestr +
                 ' on ' + datestr + '<br/>]]>')
@@ -515,7 +559,7 @@ class jpggps2kml():
                     KML.visibility('1'),
                     KML.styleUrl('#picture'),
                     KML.name(jpegbase),
-                    KML.description(cdatakey),
+                    KML.description('{' + cdatakey + '}'),
                     KML.Point(KML.coordinates('{0},{1},{2}'.format(lon, 
                                                                    lat, 
                                                                    alt)))
@@ -535,8 +579,10 @@ class jpggps2kml():
         trackfolder = imagefolder = None
         self.colourIndex = 0
         
-        if self.config['arguments']['update']:
-            with open(args['kml'], 'r') as f:
+        if ('update' in self.config['arguments'] and 
+            self.config['arguments']['update']):
+            
+            with open(args['out'], 'r') as f:
                 doc = KML.parse(f)
             # Find a folder that contains a Name with the text "tracks"
             trackfolder = doc.find('./Folder/[Name="tracks"]/..')
@@ -751,7 +797,7 @@ class jpggps2kml():
                         KML.visibility('1'),
                         KML.styleUrl('#picture'),
                         KML.name(jpg),
-                        KML.description(cdatakey),
+                        KML.description('{' + cdatakey + '}'),
                         jpegmeta['point']
                     )
                 )
@@ -766,6 +812,10 @@ class jpggps2kml():
         """
         self.read_config()
         args = self.config['arguments']
+        if not ('out' in args and args['out']):
+            print('--out is required for makekml', file=sys.stderr)
+            sys.exit(-1)
+        
         self.items = ['EXIF:DateTimeOriginal',
                       'EXIF:GPSStatus',
                       'EXIF:GPSMeasureMode',
@@ -801,17 +851,18 @@ class jpggps2kml():
                                                              et)
         
         kmlstr = str(etree.tostring(doc, pretty_print=True),
-                     encoding='UTF-8') % self.cdatatext
+                     encoding='UTF-8').format_map(self.cdatatext)
     
-        if 'kml' in args and args['kml']:
+        if 'out' in args and args['out']:
             kmlpath = os.path.abspath(
                           os.path.expanduser(
-                              os.path.expandvars(args['kml'])))
+                              os.path.expandvars(args['out'])))
             if (not os.path.isfile(kmlpath) or args['update', False]):
                 with open(kmlpath, 'w') as OUT:            
                     print(kmlstr, file=OUT)
             else:
-                print('ERROR: use --udate to overwrite ' + kmlpath)
+                print('ERROR: use --update to overwrite ' + kmlpath,
+                      file=sys.stderr)
                 sys.exit(-1)
         else:
             print(kmlstr)
@@ -1125,7 +1176,7 @@ def editgps():
             
     
 
-def orient():
+def orientjpeg():
     """
     Call jpegtrans to orient the files with pixel (0,0) in the
         top left corner.
@@ -1136,41 +1187,47 @@ def orient():
     """
     jpggps = jpggps2kml()
     jpggps.read_config()
-    transform = ['',
-                 '-flip horizontal',
-                 '-rotate 180',
-                 '-flip vertical',
-                 '-transpose',
-                 '-rotate 90',
-                 '-transverse',
-                 '-rotate 270']
-    items = ['-EXIF:Orientation']
+    transform = [[],
+                 ['-flip horizontal'],
+                 ['-rotate', '180'],
+                 ['-flip', 'vertical'],
+                 ['-transpose'],
+                 ['-rotate', '90'],
+                 ['-transverse'],
+                 ['-rotate', '270']
+                ]
+    items = ['EXIF:Orientation']
     with exiftool.ExifTool() as et:
         for d in jpggps.dirs:
             if jpggps.verbosity > 0:
                 print('Orient JPEG files in ' + d, file=sys.stderr)
             for f in os.listdir(d):
+                newf = 'new' + f
                 filebase, fileext = os.path.splitext(f)
                 if fileext in ('.jpg', '.JPG', '.jpeg', '.JPEG'):
                     filepath = os.path.join(d, f)
+                    newfilepath = os.path.join(d, newf)
                     tags = et.get_tags(items, filepath)
                     if jpggps.verbosity > 1:
                         for k in tags:
                             print(k, ' = ', tags[k], file=sys.stderr)
                     orient = int(tags['EXIF:Orientation'])
                     if orient:
-                        jpegtran_cmd = ['jpegtran',
-                                        '-copy all',
-                                        transform[orient],
-                                        filepath]
+                        jpegtran_cmd = (['jpegtran', '-copy', 'all'] +
+                                        transform[orient - 1] +
+                                        ['-outfile', newfilepath, filepath])
                         if jpggps.verbosity > 1:
-                            print('jpegtran_cmd: ' + jpegtran_cmd.join(' '), 
+                            print('jpegtran_cmd: ' + ' '.join(jpegtran_cmd), 
                                   file=sys.stderr)
                         try:                    
                             output = subprocess.call(jpegtran_cmd)
+                            if not output:
+                                os.remove(filepath)
+                                os.rename(newfilepath, filepath)
+                                
                         except OSError:
                             print(output, file=sys.stderr)
-                            print('Is jpegtran istalled?', file=sys.stderr)
+                            print('Is jpegtran installed?', file=sys.stderr)
                             raise
 
 def makekml():
