@@ -282,7 +282,7 @@ class jpggps2kml():
                     id="no_icon_n"
                 ),
                 KML.LineStyle(
-                    KML.colour(colour_normal),
+                    KML.color(colour_normal),
                     KML.width(width_normal)
                 ),
                 id=(colourID + '_n')
@@ -295,7 +295,7 @@ class jpggps2kml():
                     id="no_icon_h"
                 ),
                 KML.LineStyle(
-                    KML.colour(colour_highlight),
+                    KML.color(colour_highlight),
                     KML.width(width_highlight)
                 ),
                 id=(colourID + '_h')
@@ -541,7 +541,8 @@ class jpggps2kml():
             in_kml = ' in kml'
 
             if 'url' in args and args['url']:
-                jpegurl = '/'.join(self.config['arguments']['url'], jpegrooted)
+                jpegurl = '/'.join([self.config['arguments']['url'], 
+                                    jpegrooted])
             else:
                 jpegurl = '/'.join(['file:/', jpegdisk])
             
@@ -596,10 +597,10 @@ class jpggps2kml():
         else:
             # create a new KML structure from scratch
             doc = KML.Document(
-                      KML.description('Daily tracks and image placemarks'),
+                      KML.description('Tracks and image placemarks'),
                       KML.visibility('1'),
                       KML.open('1'),
-                      KML.name("Daily tracks and places")
+                      KML.name("Tracks and Images")
                   )
     
             # Append a style for pictures using the camera icon
@@ -857,7 +858,10 @@ class jpggps2kml():
             kmlpath = os.path.abspath(
                           os.path.expanduser(
                               os.path.expandvars(args['out'])))
-            if (not os.path.isfile(kmlpath) or args['update', False]):
+            if (not os.path.isfile(kmlpath) or 
+                'update' not in args or
+                not args['update']):
+                
                 with open(kmlpath, 'w') as OUT:            
                     print(kmlstr, file=OUT)
             else:

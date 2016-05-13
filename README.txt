@@ -17,18 +17,21 @@ INTENDED WORKFLOW
 The intended workflow is as follows:
 
 1) For each day (local time) a GPX file showing where the camera was taken 
-will be generated.  This can be done using the gpx file generated using the
-makegpx command, by downloading a GPX file from a GPS aware cellphone, or some 
-other GPS device.
+will be generated.  The makegpx command extracts GPS information from the EXIF
+headers of a set of JPEG files to create a GPX file.  Alternatively, a GPX 
+file can be downloaded from a GPS device like a cel phone, possibly editted 
+using a third party GPX editor like Adze to correct errors and/or extract
+useful subsets of the track. 
 
-2) A selection of location or event specific JPEG files is copied to a new 
-set of directories.  These may be on disk, or in a disk-based staging area
-in preparation for upload to a web-accessible file server like Google Drive.
+2) A selection of JPEG files is copied to a new set of directories. These may 
+be on disk, or in a disk-based staging area in preparation for upload to a 
+web-accessible file server.
 
-3) JPEG files in the staging area (not the original archive copies of the 
-images) that do not already have accurate GPS locations will be editted 
-from the available GPX files to include the  required EXIF GPS headers, using 
-the editgps command.
+3) Optionally, the JPEG files in the staging area that do not already have 
+GPS locations will be editted from the available GPX files to include the 
+required EXIF GPS headers.  There are many tools available to do this, 
+including the Nikon ViewNX2 viewer and exiftool.  This package implements the
+editgps command, a wrapper around exiftool.
 
 4) Optionally, the orientjpeg command can be used to standardize the 
 orientation of the images so that the (0, 0) pixel is in the top left of the 
@@ -37,13 +40,14 @@ display such images the same way, although other orientations may also be
 displayed properly if the browser supports the EXIF:Orientation header.  
 Google Earth currently does not.
 
-5) Optionally, the directories including the JPEG files from teh staging area
-can be copied to the web-accesible file server, maintaining the directory 
+5) Optionally, the directories including the JPEG files from the staging area
+can be copied to a web-accesible file server, maintaining the directory 
 structure and generating a URL for the root of the new set of directories.
 
-6) A KML file will be generated using makekml that contains track for each 
-GPX file and placemarks at the (nominal, interpolated) locations of each JPEG 
-file.  Clicking on the placemark icon will display the corresponding image.  
+6) A KML file will be generated using makekml that contains tracks copied from
+each GPX file and placemarks at the (nominal, interpolated) locations of each 
+JPEG file.  Clicking on the placemark icon will display the corresponding 
+image.  
 
 EXTERNAL PACKAGES
 =================
